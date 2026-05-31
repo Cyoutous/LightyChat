@@ -18,6 +18,8 @@ def main() -> None:
     # 4. 启动 UI 事件循环，用户输入通过 input_switch.route 处理
     ui.run(on_input=input_switch.route)
 
+    #做一个测试
+
 
 if __name__ == "__main__":
     main()
