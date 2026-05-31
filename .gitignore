@@ -1,0 +1,32 @@
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# 构建产物
+*.egg-info/
+*.egg
+build/
+dist/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 测试和覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 日志文件
+*.log
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+#sandbox
+sandbox/
