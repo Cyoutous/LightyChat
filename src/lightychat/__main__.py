@@ -1,24 +1,24 @@
-#!/usr/bin/env python3
-"""客户端主入口 - 回声测试阶段"""
+# lightychat/__main__.py
 from lightychat.client.message_queue import MessageQueue
 from lightychat.client.terminal_ui import TerminalUI
 from lightychat.client.input_switch import InputSwitch
+from lightychat.client.lobby_handler import LobbyHandler
+from lightychat.common.settings import Settings
 
 
 def main() -> None:
-    # 1. 创建消息队列
     msg_queue = MessageQueue()
+    settings = Settings()
 
-    # 2. 创建输入转移模块（暂不注入大厅和指令路由，使用内置回声逻辑）
-    input_switch = InputSwitch(message_queue=msg_queue)
+    # 大厅处理模块（on_create / on_join 暂时为 None）
+    lobby = LobbyHandler(message_queue=msg_queue, settings=settings)
 
-    # 3. 创建 TerminalUI，传入消息队列
+    # 输入转移模块，注入大厅处理模块
+    input_switch = InputSwitch(message_queue=msg_queue, lobby_handler=lobby)
+
+    # TerminalUI
     ui = TerminalUI(message_queue=msg_queue)
-
-    # 4. 启动 UI 事件循环，用户输入通过 input_switch.route 处理
     ui.run(on_input=input_switch.route)
-
-    #做一个测试
 
 
 if __name__ == "__main__":

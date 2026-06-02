@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
-from lightychat.client.message_queue import MessageQueue
 
+from lightychat.client.message_queue import MessageQueue
+from lightychat.client.lobby_handler import LobbyHandler
 
 class InputSwitch:
     """输入转移模块：根据连接状态路由用户输入，并缓存当前用户信息。"""
@@ -9,7 +10,7 @@ class InputSwitch:
     def __init__(
         self,
         message_queue: MessageQueue,
-        lobby_handler: Optional[Callable[[str], None]] = None,
+        lobby_handler: Optional[LobbyHandler] = None,
         command_router: Optional[Callable[[str], None]] = None,
     ) -> None:
         """
@@ -35,7 +36,7 @@ class InputSwitch:
         """根据当前连接状态，将用户输入分发到对应处理器。"""
         if not self._connected:
             if self._lobby is not None:
-                self._lobby(text)
+                self._lobby.handle(text)
             else:
                 # 测试期回声：未连接状态下的输入直接回显到消息区
                 self._queue.put(f"[本地-未连接] {text}")
@@ -76,7 +77,7 @@ class InputSwitch:
 
     # ---------- 后期扩展接口 ----------
 
-    def bind_lobby_handler(self, handler: Callable[[str], None]) -> None:
+    def bind_lobby_handler(self, handler: LobbyHandler) -> None:
         """注入大厅处理模块的处理函数。"""
         self._lobby = handler
 
