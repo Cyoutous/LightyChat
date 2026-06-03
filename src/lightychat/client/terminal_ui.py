@@ -34,6 +34,11 @@ def wrap_text(text: str, max_width: int) -> List[str]:
     current_line = ""
     current_width = 0
     for ch in text:
+        if ch == '\n':                     # 遇到换行，强制换行
+            lines.append(current_line)
+            current_line = ""
+            current_width = 0
+            continue
         cw = char_width(ch)
         if current_width + cw > max_width:
             lines.append(current_line)
@@ -42,8 +47,7 @@ def wrap_text(text: str, max_width: int) -> List[str]:
         else:
             current_line += ch
             current_width += cw
-    if current_line or not lines:
-        lines.append(current_line)
+    lines.append(current_line)             # 最后一行
     return lines
 
 def wrap_lines_with_prefix(text: str, prefix: str, max_width: int) -> List[Tuple[int, str]]:
