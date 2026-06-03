@@ -37,6 +37,7 @@ class LobbyHandler:
         self._commands: Dict[str, Command] = Command.discover(
             "lightychat.client.commands.lobby"
         )
+        self._context["_commands"] = self._commands
 
     # ---------- 公开接口 ----------
 
