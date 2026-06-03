@@ -116,6 +116,11 @@ class TerminalUI:
         self._input_pad = curses.newpad(self.MAX_INPUT_ROWS, self.PAD_MAX_WIDTH)
         self._input_pad.keypad(True)
 
+        #do
+        stdscr.getch()
+        time.sleep(0.02)
+
+        #主循环
         while not self._quit:
             rows, cols = self._refresh_screen_size(rows, cols)
 
@@ -144,7 +149,7 @@ class TerminalUI:
         # self._input_pad.leaveok(True)
         curses.cbreak()
         curses.noecho()
-        self._stdscr.nodelay(True)
+        self._stdscr.timeout(50) # 50ms 超时，既非阻塞又能周期性刷新
 
     def _refresh_screen_size(self, old_rows: int, old_cols: int) -> Tuple[int, int]:
         new_rows, new_cols = self._stdscr.getmaxyx()
@@ -233,6 +238,8 @@ class TerminalUI:
             self._stdscr.move(cursor_screen_row, cursor_col)
         except curses.error:
             pass
+
+        self._stdscr.noutrefresh() #?
 
     # ---------- 内部：键盘处理 ----------
 

@@ -3,6 +3,10 @@ from typing import Any
 from lightychat.client.commands.base_command import Command
 
 class QuitCommand(Command):
+    '''
+        仅作信息提示使用，实际执行处在terminal_ui。
+    '''
+
     name = "quit"
     brief = "退出程序"
     detail = (
