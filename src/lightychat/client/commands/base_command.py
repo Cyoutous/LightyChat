@@ -11,6 +11,8 @@ class Command(ABC):
     """指令抽象基类。子类必须定义 name 类属性并实现 execute 方法。"""
 
     name: str = ""
+    brief: str = ""   # 一行简介，用于 /help 概览
+    detail: str = ""  # 详细说明，用于 /help <指令名>
 
     @abstractmethod
     def execute(self, args: list[str], context: dict[str, Any]) -> None:
