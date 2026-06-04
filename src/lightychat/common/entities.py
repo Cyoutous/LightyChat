@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import Any
 
 
 class MessageType(IntEnum):
@@ -29,14 +30,14 @@ class Message:
 class User:
     user_id: str
     short_id: int
-    sock: object
+    sock: Any
     is_host: bool
     is_muted: bool
     last_active: float
     addr: tuple[str, int]
 
-    sender: object = None    # Sender 实例，类型用 object 避免循环导入
-    receiver: object = None  # Receiver 实例
+    sender: Any = None    # Sender 实例
+    receiver: Any = None  # Receiver 实例
 
 
 """协议层异常基类"""

@@ -6,6 +6,8 @@ from typing import Any, Dict, Optional
 
 from lightychat.server.user_table import UserTable
 from lightychat.common.protocol_handler import ProtocolHandler
+from lightychat.server.connection_manager import ConnectionManager
+from lightychat.server.message_router import MessageRouter
 
 logger = logging.getLogger(__name__)
 
@@ -18,18 +20,6 @@ class _BaseModule:
     """所有子模块的基类，统一 start/stop 接口。"""
     def start(self) -> None: ...
     def stop(self) -> None: ...
-
-
-class _ConnectionManager(_BaseModule):
-    """连接管理器接口：监听端口，accept 新连接，管理所有客户端收发线程。"""
-    def __init__(self, port: int, user_table: UserTable, proto: ProtocolHandler,
-                 router: Any, max_users: int) -> None: ...
-
-
-class _MessageRouter:
-    """消息路由器接口：根据消息类型和接收方决定投递范围。"""
-    def __init__(self, user_table: UserTable, command_handler: Any,
-                 message_logger: Any) -> None: ...
 
 
 class _CommandHandler:
@@ -72,10 +62,12 @@ class ServerController:
         self._command_handler: _CommandHandler = _CommandHandler(
             self._user_table, self._admin_token
         )
-        self._message_router: _MessageRouter = _MessageRouter(
-            self._user_table, self._command_handler, self._message_logger
+        self._message_router = MessageRouter(
+            self._user_table,
+            command_handler=self._command_handler,
+            message_logger=self._message_logger,
         )
-        self._connection_manager: _ConnectionManager = _ConnectionManager(
+        self._connection_manager = ConnectionManager(
             self._port, self._user_table, self._proto,
             self._message_router, self._max_users,
         )
@@ -86,19 +78,21 @@ class ServerController:
         self._running = False
         self._acceptor_thread: Optional[threading.Thread] = None
         self._heartbeat_thread: Optional[threading.Thread] = None
+    
+    # ====start====
 
     def start(self) -> None:
         """启动服务端线程。"""
+        print("[DEBUG] ConnectionManager.start() called")
         if self._running:
             return
         self._running = True
 
         self._acceptor_thread = threading.Thread(
-            target=self._connection_manager.start,
+            target=self._run_connection_manager,
             daemon=True, name="Acceptor",
         )
         self._acceptor_thread.start()
-        self._ready_event.set()
 
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat_checker.start,
@@ -106,9 +100,19 @@ class ServerController:
         )
         self._heartbeat_thread.start()
 
+    def _run_connection_manager(self) -> None:
+        try:
+            self._connection_manager.start()
+            self._ready_event.set()
+        except Exception:
+            logger.exception("服务端连接管理器启动失败")
+
     def wait_until_ready(self, timeout: Optional[float] = None) -> bool:
         """等待服务端就绪，返回是否在超时前准备完成。"""
         return self._ready_event.wait(timeout)
+    
+
+    # ====stop====
 
     def stop(self) -> None:
         """优雅关闭服务端。"""
