@@ -1,6 +1,7 @@
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 
 from lightychat.client.commands.base_command import Command
+from lightychat.client.session_controller import SessionController
 from lightychat.client.message_queue import MessageQueue
 from lightychat.common.entities import MessageType
 from lightychat.common.settings import Settings
@@ -13,8 +14,7 @@ class LobbyHandler:
         self,
         message_queue: MessageQueue,
         settings: Settings,
-        on_create: Optional[Callable[[str, int, str, str], None]] = None,
-        on_join: Optional[Callable[[str, str], None]] = None,
+        session: Optional[SessionController] = None,
     ) -> None:
         self._queue = message_queue
         self._settings = settings
@@ -22,8 +22,7 @@ class LobbyHandler:
         self._context: Dict[str, Any] = {
             "queue": self._queue,
             "settings": self._settings,
-            "on_create": on_create,
-            "on_join": on_join,
+            "session": session,  # 注入 SessionController
         }
 
         self._commands: Dict[str, Command] = Command.discover(
@@ -70,10 +69,6 @@ class LobbyHandler:
                 MessageType.TYPE_LOCAL_ERROR,
             )
 
-    def set_on_create(
-        self, callback: Callable[[str, int, str, str], None]
-    ) -> None:
-        self._context["on_create"] = callback
-
-    def set_on_join(self, callback: Callable[[str, str], None]) -> None:
-        self._context["on_join"] = callback
+    def set_session(self, session: SessionController) -> None:
+        """后期注入 SessionController。"""
+        self._context["session"] = session
