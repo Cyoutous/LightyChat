@@ -164,7 +164,7 @@ class TerminalUI:
             # 4. 光标定位与刷新
             self._position_cursor(display_lines, cols, rows)
             self._stdscr.noutrefresh()
-            curses.doupdate()
+            #curses.doupdate()
 
             # 5. 处理键盘输入（非阻塞）
             self._handle_input(stdscr)
