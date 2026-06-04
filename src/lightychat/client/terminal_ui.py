@@ -7,6 +7,7 @@ import time
 from typing import Any, Callable, List, Optional, Tuple
 
 from lightychat.client.message_queue import MessageQueue
+from lightychat.common.entities import MessageType
 
 try:
     locale.setlocale(locale.LC_ALL, '')
@@ -70,15 +71,42 @@ def wrap_lines_with_prefix(text: str, prefix: str, max_width: int) -> List[Tuple
     return lines
 
 
+# ================================================================================================
+
 # ========== TerminalUI 类 ==========
 
 class TerminalUI:
     """终端 UI 模块：管理消息面板和输入面板，提供输入回调与消息队列接口。"""
 
+    # ===================
+    # ====== 常量 =======
+
     PREFIX = "> "
     MAX_INPUT_ROWS = 10
-    PAD_MAX_WIDTH = 500
+    PAD_MAX_WIDTH = 2000
     PAD_MAX_HEIGHT = 10000
+
+    # 颜色对编号
+    COLOR_DEFAULT = 1       # 默认前景色（终端默认）
+    COLOR_SYSTEM = 2        # 系统消息
+    COLOR_CHAT = 3          # 公屏消息
+    COLOR_PRIVATE = 4       # 私聊消息
+    COLOR_RESPONSE = 5      # 指令响应
+    COLOR_ERROR = 6         # 错误提示
+
+     # 消息类型 → 颜色对编号 映射
+    TYPE_COLOR_MAP: dict[MessageType | None, int] = {
+        MessageType.TYPE_SYSTEM:          COLOR_SYSTEM,
+        MessageType.TYPE_MESSAGE_DELIVER: COLOR_CHAT,
+        MessageType.TYPE_PRIVATE_DELIVER: COLOR_PRIVATE,
+        MessageType.TYPE_RESPONSE:        COLOR_RESPONSE,
+        MessageType.TYPE_LOCAL_INFO:      COLOR_SYSTEM,
+        MessageType.TYPE_LOCAL_ERROR:     COLOR_ERROR,
+        None:                             COLOR_DEFAULT,
+    }
+
+    # ==================
+    # ====== 方法 ======
 
     def __init__(self, message_queue: MessageQueue) -> None:
         self._queue = message_queue
@@ -86,9 +114,7 @@ class TerminalUI:
         self._quit: bool = False
 
         self._stdscr: Any = None
-        self._msg_pad: Any = None
-        self._input_pad: Any = None
-        self._current_msg_row: int = 1
+        self._message_history: list[tuple[str, Optional[MessageType]]] = []
         self._input_buffer: str = ""
         self._cursor_index: int = 0
 
@@ -109,37 +135,41 @@ class TerminalUI:
         self._stdscr = stdscr
         self._setup_curses()
         rows, cols = stdscr.getmaxyx()
-        self._msg_pad = curses.newpad(self.PAD_MAX_HEIGHT, self.PAD_MAX_WIDTH)
-        #self._msg_pad.leaveok(True)
-        self._msg_pad.scrollok(True)
-        self._msg_pad.addstr(0, 0, "Chat started! Type /quit to exit. Ctrl+Q to quit UI.")
-        self._input_pad = curses.newpad(self.MAX_INPUT_ROWS, self.PAD_MAX_WIDTH)
-        self._input_pad.keypad(True)
 
-        #do
+        # 初始欢迎信息
+        self._message_history.append(
+            ("Chat started! Type /quit to exit. Ctrl+Q to quit UI.", None)
+        )
+
+        # 首次阻塞等待，避免启动时闪烁过快
         stdscr.getch()
         time.sleep(0.02)
 
-        #主循环
+        # 主循环
         while not self._quit:
             rows, cols = self._refresh_screen_size(rows, cols)
 
-            # 1. 检查消息队列，更新消息面板
+            # 1. 检查消息队列，更新消息历史
             self._flush_messages(cols)
 
-            # 2. 绘制输入面板
-            display_lines = self._draw_input_panel(cols, rows)
+            # 2. 预计算输入面板折行
+            display_lines = self._get_input_display_lines(cols)
+            input_height = len(display_lines)
 
-            # 3. 光标定位
+            # 3. 绘制消息与输入面板
+            self._stdscr.erase()
+            self._draw_message_panel(cols, rows, input_height)
+            self._draw_input_panel(cols, rows, display_lines)
+
+            # 4. 光标定位与刷新
             self._position_cursor(display_lines, cols, rows)
+            self._stdscr.noutrefresh()
+            curses.doupdate()
 
-            # + 或许有用的光标设置方式 （补：不要加这个指令，有问题。这里留下这个注释用于以后研究
-            #curses.doupdate()
-
-            # 4. 处理键盘输入（非阻塞）
+            # 5. 处理键盘输入（非阻塞）
             self._handle_input(stdscr)
 
-            # 5. 短暂休眠，避免空转
+            # 6. 短暂休眠，避免空转
             time.sleep(0.02)
 
     def _setup_curses(self) -> None:
@@ -151,6 +181,18 @@ class TerminalUI:
         curses.noecho()
         self._stdscr.timeout(50) # 50ms 超时，既非阻塞又能周期性刷新
 
+        # 初始化颜色支持
+        if curses.has_colors():
+            curses.start_color()
+            # 颜色对定义（可根据终端外观调整）
+            curses.init_pair(self.COLOR_DEFAULT,  curses.COLOR_WHITE, curses.COLOR_BLACK)
+            curses.init_pair(self.COLOR_SYSTEM,   curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            curses.init_pair(self.COLOR_CHAT,     curses.COLOR_GREEN,  curses.COLOR_BLACK)
+            curses.init_pair(self.COLOR_PRIVATE,  curses.COLOR_MAGENTA,curses.COLOR_BLACK)
+            curses.init_pair(self.COLOR_RESPONSE, curses.COLOR_CYAN,   curses.COLOR_BLACK)
+            curses.init_pair(self.COLOR_ERROR,    curses.COLOR_WHITE,    curses.COLOR_RED)
+
+
     def _refresh_screen_size(self, old_rows: int, old_cols: int) -> Tuple[int, int]:
         new_rows, new_cols = self._stdscr.getmaxyx()
         if new_rows != old_rows or new_cols != old_cols:
@@ -161,53 +203,75 @@ class TerminalUI:
     # ---------- 内部：消息队列轮询 ----------
 
     def _flush_messages(self, cols: int) -> None:
-        """非阻塞检查消息队列，将所有待显示文本追加到消息面板。"""
+        """非阻塞检查消息队列，将所有待显示文本追加到消息历史。"""
         while True:
-            text = self._queue.get_nowait()
-            if text is None:
+            item = self._queue.get_nowait()
+            if item is None:
                 break
+            text, msg_type = item
+
             wrapped = wrap_text(text, cols)
             for line in wrapped:
-                self._msg_pad.addstr(self._current_msg_row, 0, line)
-                self._current_msg_row += 1
+                self._message_history.append((line, msg_type))
+
+            # 保持历史不超过缓冲高度
+            if len(self._message_history) > self.PAD_MAX_HEIGHT:
+                self._message_history = self._message_history[-self.PAD_MAX_HEIGHT:]
 
     # ---------- 内部：输入面板绘制 ----------
 
-    def _draw_input_panel(self, cols: int, rows: int) -> List[Tuple[int, str]]:
+    def _draw_message_panel(self, cols: int, rows: int, input_height: int) -> None:
+        msg_area_height = max(1, rows - input_height)
+        visible_messages = self._message_history[-msg_area_height:]
+
+        for row in range(msg_area_height):
+            if row < len(visible_messages):
+                line, msg_type = visible_messages[row]
+                attr = curses.color_pair(
+                    self.TYPE_COLOR_MAP.get(msg_type, self.COLOR_DEFAULT)
+                )
+                try:
+                    self._stdscr.addstr(row, 0, line[:cols], attr)
+                except curses.error:
+                    pass
+                try:
+                    if display_width(line) < cols:
+                        self._stdscr.addstr(row, display_width(line), " " * (cols - display_width(line)))
+                except curses.error:
+                    pass
+            else:
+                try:
+                    self._stdscr.move(row, 0)
+                    self._stdscr.clrtoeol()
+                except curses.error:
+                    pass
+
+    def _draw_input_panel(self, cols: int, rows: int, display_lines: List[Tuple[int, str]]) -> None:
         max_input_rows = min(self.MAX_INPUT_ROWS, rows - 2)
         if max_input_rows < 1:
             max_input_rows = 1
 
-        display_lines = wrap_lines_with_prefix(self._input_buffer, self.PREFIX, cols)
         if len(display_lines) > max_input_rows:
             display_lines = display_lines[-max_input_rows:]
 
         input_height = len(display_lines)
-        msg_area_height = max(1, rows - input_height)
+        input_top_row = rows - input_height
 
-        # 刷新消息面板
-        if self._current_msg_row >= msg_area_height:
-            scroll_start = self._current_msg_row - msg_area_height + 1
-        else:
-            scroll_start = 0
-
-        pad_bottom = min(msg_area_height - 1, rows - 1)
-        pad_right = min(cols - 1, self.PAD_MAX_WIDTH - 1)
-        self._msg_pad.noutrefresh(scroll_start, 0, 0, 0, pad_bottom, pad_right)
-
-        # 绘制输入面板
-        self._input_pad.clear()
-        for i, (_, line_text) in enumerate(display_lines):
+        for i in range(input_top_row, rows):
             try:
-                self._input_pad.addstr(i, 0, line_text)
+                self._stdscr.move(i, 0)
+                self._stdscr.clrtoeol()
             except curses.error:
                 pass
 
-        input_top_row = rows - input_height
-        in_bottom = min(input_top_row + input_height - 1, rows - 1)
-        in_right = min(cols - 1, self.PAD_MAX_WIDTH - 1)
-        self._input_pad.noutrefresh(0, 0, input_top_row, 0, in_bottom, in_right)
+        for i, (_, line_text) in enumerate(display_lines):
+            try:
+                self._stdscr.addstr(input_top_row + i, 0, line_text[:cols])
+            except curses.error:
+                pass
 
+    def _get_input_display_lines(self, cols: int) -> List[Tuple[int, str]]:
+        display_lines = wrap_lines_with_prefix(self._input_buffer, self.PREFIX, cols)
         return display_lines
 
     # ---------- 内部：光标定位 ----------
@@ -238,8 +302,6 @@ class TerminalUI:
             self._stdscr.move(cursor_screen_row, cursor_col)
         except curses.error:
             pass
-
-        self._stdscr.noutrefresh() #?
 
     # ---------- 内部：键盘处理 ----------
 

@@ -2,6 +2,7 @@
 from typing import Any
 
 from lightychat.client.commands.base_command import Command
+from lightychat.common.entities import MessageType
 
 
 class HelpCommand(Command):
@@ -22,7 +23,7 @@ class HelpCommand(Command):
             lines = ["可用指令："]
             for name, cmd in sorted(commands.items()):
                 lines.append(f"  /{name:<10} {cmd.brief}")
-            queue.put("\n".join(lines))
+            queue.put("\n".join(lines), MessageType.TYPE_LOCAL_INFO)
             return
 
         target = args[0].lower()
@@ -30,9 +31,13 @@ class HelpCommand(Command):
         if cmd is None:
             queue.put(
                 f"[系统] 没有关于 '/{target}' 的帮助信息。"
-                f"输入 /help 查看可用指令列表。"
+                f"输入 /help 查看可用指令列表。",
+                MessageType.TYPE_LOCAL_ERROR,
             )
         elif not cmd.detail:
-            queue.put(f"[系统] '/{target}' 暂无详细帮助信息。")
+            queue.put(
+                f"[系统] '/{target}' 暂无详细帮助信息。",
+                MessageType.TYPE_LOCAL_INFO,
+            )
         else:
-            queue.put(cmd.detail)
+            queue.put(cmd.detail, MessageType.TYPE_LOCAL_INFO)
