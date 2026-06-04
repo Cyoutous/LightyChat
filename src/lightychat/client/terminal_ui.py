@@ -131,6 +131,7 @@ class TerminalUI:
         self._input_buffer: str = ""
         self._cursor_index: int = 0
         self._needs_refresh: bool = True
+        self._input_pad: Any = None
 
     # ---------- 公开接口 ----------
 
@@ -150,6 +151,11 @@ class TerminalUI:
         self._setup_curses()
         rows, cols = stdscr.getmaxyx()
 
+        # 创建输入面板 pad（消息面板继续用 stdscr）
+        self._input_pad = curses.newpad(self.MAX_INPUT_ROWS, max(cols, self.PAD_MAX_WIDTH))
+        self._input_pad.keypad(True)
+        self._input_pad.leaveok(True)  # pad 不参与光标管理，光标由 stdscr 控制
+
         # 初始欢迎信息
         self._message_history.append(
             ("Chat started! Type /quit to exit. Ctrl+Q to quit UI.", None)
@@ -166,33 +172,43 @@ class TerminalUI:
             # 1. 检查消息队列，更新消息历史
             self._flush_messages(cols)
 
-            # 2. 预计算输入面板折行
+            # 2. 预计算输入面板折行，并限制最大行数
             display_lines = self._get_input_display_lines(cols)
+            max_input_rows = min(self.MAX_INPUT_ROWS, rows - 2)
+            if max_input_rows < 1:
+                max_input_rows = 1
+            if len(display_lines) > max_input_rows:
+                display_lines = display_lines[-max_input_rows:]
             input_height = len(display_lines)
 
-            # 3. 绘制消息与输入面板
+            # 3. 在 stdscr 上绘制消息面板
             self._stdscr.erase()
             self._draw_message_panel(cols, rows, input_height)
+
+            # 4. 🔑 将光标定位到输入位置 — 必须在 stdscr.noutrefresh() 之前，
+            #    因为只有 stdscr 的 noutrefresh 会传播光标到物理终端（pad 的不行）
+            self._set_input_cursor(display_lines, cols, rows)
+
+            # 5. 提交 stdscr → 虚拟屏幕（消息内容 + 光标位置）
+            self._stdscr.noutrefresh()
+
+            # 6. pad 覆盖底部输入区域 — 纯内容绘制，不涉及光标
             self._draw_input_panel(cols, rows, display_lines)
 
-            # 4. 光标定位与刷新
-            self._position_cursor(display_lines, cols, rows)
-            self._stdscr.noutrefresh()
+            # 7. 物理刷新到终端
             if self._needs_refresh:
                 curses.doupdate()
                 self._needs_refresh = False
 
-            # 5. 处理键盘输入（非阻塞）
+            # 8. 处理键盘输入（非阻塞）
             self._handle_input(stdscr)
 
-            # 6. 短暂休眠，避免空转
+            # 9. 短暂休眠，避免空转
             time.sleep(0.02)
 
     def _setup_curses(self) -> None:
         curses.curs_set(1)
-        # self._input_pad = curses.newpad(self.MAX_INPUT_ROWS, self.PAD_MAX_WIDTH)
         self._stdscr.keypad(True)
-        # self._input_pad.leaveok(True)
         curses.cbreak()
         curses.noecho()
         self._stdscr.timeout(50) # 50ms 超时，既非阻塞又能周期性刷新
@@ -215,6 +231,15 @@ class TerminalUI:
             self._stdscr.clear()
             self._stdscr.refresh()
             self._needs_refresh = True
+
+            # 如果终端宽度超过 pad 宽度，重建输入 pad（pad 需要至少和屏幕一样宽）
+            if self._input_pad is not None:
+                _, pad_cols = self._input_pad.getmaxyx()
+                if new_cols > pad_cols:
+                    self._input_pad = curses.newpad(self.MAX_INPUT_ROWS, new_cols)
+                    self._input_pad.keypad(True)
+                    self._input_pad.leaveok(True)
+
         return new_rows, new_cols
 
     # ---------- 内部：消息队列轮询 ----------
@@ -255,12 +280,7 @@ class TerminalUI:
                 safe_line = trim_text_to_width(line, cols)
                 try:
                     self._stdscr.addstr(row, 0, safe_line, attr)
-                except curses.error:
-                    pass
-                try:
-                    line_width = display_width(safe_line)
-                    if line_width < cols:
-                        self._stdscr.addstr(row, line_width, " " * (cols - line_width))
+                    self._stdscr.clrtoeol()  # 清除该行剩余部分（处理宽字符和残留）
                 except curses.error:
                     pass
             else:
@@ -271,54 +291,50 @@ class TerminalUI:
                     pass
 
     def _draw_input_panel(self, cols: int, rows: int, display_lines: List[Tuple[int, str]]) -> None:
-        max_input_rows = min(self.MAX_INPUT_ROWS, rows - 2)
-        if max_input_rows < 1:
-            max_input_rows = 1
-
-        if len(display_lines) > max_input_rows:
-            display_lines = display_lines[-max_input_rows:]
-
+        """在 pad 上绘制输入内容并覆盖到屏幕底部输入区域（纯内容，不涉及光标）。"""
         input_height = len(display_lines)
+        if input_height < 1:
+            return
         input_top_row = rows - input_height
 
-        for i in range(input_top_row, rows):
-            try:
-                self._stdscr.move(i, 0)
-                self._stdscr.clrtoeol()
-            except curses.error:
-                pass
-
+        # 清空 pad 并绘制
+        self._input_pad.clear()
         for i, (_, line_text) in enumerate(display_lines):
             safe_line = trim_text_to_width(line_text, cols)
             try:
-                self._stdscr.addstr(input_top_row + i, 0, safe_line)
+                self._input_pad.addstr(i, 0, safe_line)
             except curses.error:
                 pass
+            # 行尾填充空格以清除残留（宽字符变窄时的残余显示）
             try:
                 line_width = display_width(safe_line)
                 if line_width < cols:
-                    self._stdscr.addstr(input_top_row + i, line_width, " " * (cols - line_width))
+                    self._input_pad.addstr(i, line_width, " " * (cols - line_width))
             except curses.error:
                 pass
 
-    def _get_input_display_lines(self, cols: int) -> List[Tuple[int, str]]:
-        display_lines = wrap_lines_with_prefix(self._input_buffer, self.PREFIX, cols)
-        return display_lines
+        # 将 pad 刷新到屏幕底部输入区域（在 stdscr.noutrefresh 之后调用，覆盖 stdscr 的空行）
+        in_bottom = min(input_top_row + input_height - 1, rows - 1)
+        in_right = min(cols - 1, self.PAD_MAX_WIDTH - 1)
+        self._input_pad.noutrefresh(0, 0, input_top_row, 0, in_bottom, in_right)
 
-    # ---------- 内部：光标定位 ----------
-
-    def _position_cursor(
+    def _set_input_cursor(
         self,
         display_lines: List[Tuple[int, str]],
         cols: int,
         rows: int,
     ) -> None:
+        """将 stdscr 的光标定位到输入区域的光标位置。
+
+        必须在 stdscr.noutrefresh() 之前调用，因为只有 stdscr 的 noutrefresh
+        会把光标传播到物理终端（curses pad 的 noutrefresh 不传播光标）。
+        """
         input_height = len(display_lines)
+        if input_height < 1:
+            return
         input_top_row = rows - input_height
         cursor_line = self._find_cursor_line(display_lines)
-        # cursor_col = 0
 
-        # 计算光标所在列
         start_idx = display_lines[cursor_line][0]
         before = self._input_buffer[start_idx:self._cursor_index]
         if cursor_line == 0:
@@ -333,6 +349,10 @@ class TerminalUI:
             self._stdscr.move(cursor_screen_row, cursor_col)
         except curses.error:
             pass
+
+    def _get_input_display_lines(self, cols: int) -> List[Tuple[int, str]]:
+        display_lines = wrap_lines_with_prefix(self._input_buffer, self.PREFIX, cols)
+        return display_lines
 
     # ---------- 内部：键盘处理 ----------
 

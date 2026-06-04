@@ -1,10 +1,12 @@
 from __future__ import annotations
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+# from codeop import CommandCompiler
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from lightychat.client.message_queue import MessageQueue
 
 if TYPE_CHECKING:
     from lightychat.client.lobby_handler import LobbyHandler
+    from lightychat.client.command_router import CommandRouter
 
 class InputSwitch:
     """输入转移模块：根据连接状态路由用户输入，并缓存当前用户信息。"""
@@ -13,7 +15,7 @@ class InputSwitch:
         self,
         message_queue: MessageQueue,
         lobby_handler: Optional[LobbyHandler] = None,
-        command_router: Optional[Callable[[str], None]] = None,
+        command_router: Optional[CommandRouter] = None,
     ) -> None:
         """
         Args:
@@ -44,7 +46,7 @@ class InputSwitch:
                 self._queue.put(f"[本地-未连接] {text}")
         else:
             if self._router is not None:
-                self._router(text)
+                self._router.route(text)
             else:
                 # 测试期回声：已连接状态下的输入直接回显
                 self._queue.put(f"[本地-已连接] {text}")
@@ -83,6 +85,6 @@ class InputSwitch:
         """注入大厅处理模块的处理函数。"""
         self._lobby = handler
 
-    def bind_command_router(self, router: Callable[[str], None]) -> None:
+    def bind_command_router(self, router: CommandRouter) -> None:
         """注入指令路由模块的路由函数。"""
         self._router = router

@@ -47,7 +47,10 @@ class Command(ABC):
         commands: Dict[str, "Command"] = {}
         for subclass in cls._get_all_subclasses(Command):
             if subclass.name:
-                commands[subclass.name] = subclass()
+                # 检查子类所属模块是否在指定包路径下
+                module_path = subclass.__module__
+                if module_path.startswith(package_path):
+                    commands[subclass.name] = subclass()
         return commands
 
     @staticmethod
