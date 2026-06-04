@@ -35,6 +35,9 @@ class User:
     last_active: float
     addr: tuple[str, int]
 
+    sender: object = None    # Sender 实例，类型用 object 避免循环导入
+    receiver: object = None  # Receiver 实例
+
 
 """协议层异常基类"""
 class ProtocolException(Exception):
