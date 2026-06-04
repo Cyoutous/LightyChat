@@ -30,6 +30,19 @@ def char_width(ch: str) -> int:
     import unicodedata
     return 2 if unicodedata.east_asian_width(ch) in ('W', 'F') else 1
 
+
+def trim_text_to_width(text: str, max_width: int) -> str:
+    result = ""
+    width = 0
+    for ch in text:
+        cw = char_width(ch)
+        if width + cw > max_width:
+            break
+        result += ch
+        width += cw
+    return result
+
+
 def wrap_text(text: str, max_width: int) -> List[str]:
     lines: List[str] = []
     current_line = ""
@@ -117,6 +130,7 @@ class TerminalUI:
         self._message_history: list[tuple[str, Optional[MessageType]]] = []
         self._input_buffer: str = ""
         self._cursor_index: int = 0
+        self._needs_refresh: bool = True
 
     # ---------- 公开接口 ----------
 
@@ -164,7 +178,9 @@ class TerminalUI:
             # 4. 光标定位与刷新
             self._position_cursor(display_lines, cols, rows)
             self._stdscr.noutrefresh()
-            #curses.doupdate()
+            if self._needs_refresh:
+                curses.doupdate()
+                self._needs_refresh = False
 
             # 5. 处理键盘输入（非阻塞）
             self._handle_input(stdscr)
@@ -198,17 +214,20 @@ class TerminalUI:
         if new_rows != old_rows or new_cols != old_cols:
             self._stdscr.clear()
             self._stdscr.refresh()
+            self._needs_refresh = True
         return new_rows, new_cols
 
     # ---------- 内部：消息队列轮询 ----------
 
     def _flush_messages(self, cols: int) -> None:
         """非阻塞检查消息队列，将所有待显示文本追加到消息历史。"""
+        updated = False
         while True:
             item = self._queue.get_nowait()
             if item is None:
                 break
             text, msg_type = item
+            updated = True
 
             wrapped = wrap_text(text, cols)
             for line in wrapped:
@@ -217,6 +236,9 @@ class TerminalUI:
             # 保持历史不超过缓冲高度
             if len(self._message_history) > self.PAD_MAX_HEIGHT:
                 self._message_history = self._message_history[-self.PAD_MAX_HEIGHT:]
+
+        if updated:
+            self._needs_refresh = True
 
     # ---------- 内部：输入面板绘制 ----------
 
@@ -230,13 +252,15 @@ class TerminalUI:
                 attr = curses.color_pair(
                     self.TYPE_COLOR_MAP.get(msg_type, self.COLOR_DEFAULT)
                 )
+                safe_line = trim_text_to_width(line, cols)
                 try:
-                    self._stdscr.addstr(row, 0, line[:cols], attr)
+                    self._stdscr.addstr(row, 0, safe_line, attr)
                 except curses.error:
                     pass
                 try:
-                    if display_width(line) < cols:
-                        self._stdscr.addstr(row, display_width(line), " " * (cols - display_width(line)))
+                    line_width = display_width(safe_line)
+                    if line_width < cols:
+                        self._stdscr.addstr(row, line_width, " " * (cols - line_width))
                 except curses.error:
                     pass
             else:
@@ -265,8 +289,15 @@ class TerminalUI:
                 pass
 
         for i, (_, line_text) in enumerate(display_lines):
+            safe_line = trim_text_to_width(line_text, cols)
             try:
-                self._stdscr.addstr(input_top_row + i, 0, line_text[:cols])
+                self._stdscr.addstr(input_top_row + i, 0, safe_line)
+            except curses.error:
+                pass
+            try:
+                line_width = display_width(safe_line)
+                if line_width < cols:
+                    self._stdscr.addstr(input_top_row + i, line_width, " " * (cols - line_width))
             except curses.error:
                 pass
 
@@ -318,6 +349,7 @@ class TerminalUI:
         # 普通字符或回车
         if ch == '\n':
             self._submit_input()
+            self._needs_refresh = True
         elif ch in ('\x7f', '\b'):
             if self._cursor_index > 0:
                 self._input_buffer = (
@@ -325,6 +357,7 @@ class TerminalUI:
                     + self._input_buffer[self._cursor_index:]
                 )
                 self._cursor_index -= 1
+                self._needs_refresh = True
         else:
             self._input_buffer = (
                 self._input_buffer[:self._cursor_index]
@@ -332,20 +365,24 @@ class TerminalUI:
                 + self._input_buffer[self._cursor_index:]
             )
             self._cursor_index += len(ch)
+            self._needs_refresh = True
 
     def _handle_function_key(self, ch: int) -> None:
         if ch == 3:                     # Ctrl+C
             self._quit = True
         elif ch == 17:                  # Ctrl+Q
             self._quit = True
+            self._needs_refresh = True
         elif ch == curses.KEY_RESIZE:
-            pass
+            self._needs_refresh = True
         elif ch == curses.KEY_LEFT:
             if self._cursor_index > 0:
                 self._cursor_index -= 1
+                self._needs_refresh = True
         elif ch == curses.KEY_RIGHT:
             if self._cursor_index < len(self._input_buffer):
                 self._cursor_index += 1
+                self._needs_refresh = True
         elif ch == curses.KEY_UP:
             lines = self._get_current_display_lines()
             cur_line = self._find_cursor_line(lines)
@@ -353,16 +390,20 @@ class TerminalUI:
                 # 移到上一行末尾
                 prev_line_end = lines[cur_line][0] - 1
                 self._cursor_index = max(0, prev_line_end)
+                self._needs_refresh = True
         elif ch == curses.KEY_DOWN:
             lines = self._get_current_display_lines()
             cur_line = self._find_cursor_line(lines)
             if cur_line < len(lines) - 1:
                 next_line_start = lines[cur_line + 1][0]
                 self._cursor_index = min(next_line_start, len(self._input_buffer))
+                self._needs_refresh = True
         elif ch == curses.KEY_HOME:
             self._cursor_index = 0
+            self._needs_refresh = True
         elif ch == curses.KEY_END:
             self._cursor_index = len(self._input_buffer)
+            self._needs_refresh = True
         elif ch in (curses.KEY_BACKSPACE, 8, 127):
             if self._cursor_index > 0:
                 self._input_buffer = (
@@ -370,12 +411,14 @@ class TerminalUI:
                     + self._input_buffer[self._cursor_index:]
                 )
                 self._cursor_index -= 1
+                self._needs_refresh = True
         elif ch == curses.KEY_DC:
             if self._cursor_index < len(self._input_buffer):
                 self._input_buffer = (
                     self._input_buffer[:self._cursor_index]
                     + self._input_buffer[self._cursor_index + 1:]
                 )
+                self._needs_refresh = True
 
     def _submit_input(self) -> None:
         """用户按下回车，将输入文本通过回调提交给上层，并清空输入区。"""

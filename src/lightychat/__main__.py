@@ -9,6 +9,8 @@ from lightychat.client.lobby_handler import LobbyHandler
 from lightychat.client.session_controller import SessionController
 from lightychat.common.settings import Settings
 
+from lightychat.common.entities import  MessageType
+
 
 def main() -> None:
     # -----------------------------------------------
@@ -42,6 +44,20 @@ def main() -> None:
     # -----------------------------------------------
     input_switch.bind_lobby_handler(lobby)
     # input_switch.bind_command_router(chat_router)  # 待实现
+
+     # ---------- 临时：已连接状态下的简易路由器 ----------
+    def temp_chat_router(text: str) -> None:
+        if text.startswith("/"):
+            msg_queue.put(
+                f"[系统] 指令 '{text}' 暂未实现。",
+                MessageType.TYPE_LOCAL_ERROR,
+            )
+        else:
+            session.send_chat_message(text)
+    # -----------------------------------------------
+
+    input_switch.bind_command_router(temp_chat_router)
+
 
     # -----------------------------------------------
     # 6. 启动终端界面（阻塞，直到用户退出）
