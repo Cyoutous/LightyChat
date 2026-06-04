@@ -1,6 +1,7 @@
 from typing import Any
 
 from lightychat.client.commands.base_command import Command
+from lightychat.common.entities import MessageType
 
 class QuitCommand(Command):
     '''
@@ -18,4 +19,4 @@ class QuitCommand(Command):
         queue = context["queue"]
 
         if args:
-            queue.put(f"[系统] quit指令不能携带参数")
+            queue.put(f"[系统] quit指令不能携带参数", MessageType.TYPE_LOCAL_ERROR)
