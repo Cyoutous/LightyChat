@@ -1,8 +1,10 @@
 from __future__ import annotations
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from lightychat.client.message_queue import MessageQueue
-from lightychat.client.lobby_handler import LobbyHandler
+
+if TYPE_CHECKING:
+    from lightychat.client.lobby_handler import LobbyHandler
 
 class InputSwitch:
     """输入转移模块：根据连接状态路由用户输入，并缓存当前用户信息。"""

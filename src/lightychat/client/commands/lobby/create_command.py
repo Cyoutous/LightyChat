@@ -73,11 +73,11 @@ class CreateCommand(Command):
         )
 
         # 调用预留的连接回调
-        on_create = context.get("on_create")
-        if on_create is not None:
-            on_create("127.0.0.1", port, user_id, admin_token)
+        session = context.get("session")
+        if session is not None:
+            session.create_chat("127.0.0.1", port, user_id, admin_token)
         else:
             queue.put(
-                "[系统] 创建聊天室功能尚未接入网络模块（on_create 回调为空）。",
-                MessageType.TYPE_LOCAL_INFO,
+                "[系统] 创建聊天室功能尚未就绪（session 为空）。",
+                MessageType.TYPE_LOCAL_ERROR,
             )

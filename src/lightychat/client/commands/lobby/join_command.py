@@ -68,11 +68,11 @@ class JoinCommand(Command):
         )
 
         # 调用预留的连接回调
-        on_join = context.get("on_join")
-        if on_join is not None:
-            on_join(address, user_id)
+        session = context.get("session")
+        if session is not None:
+            session.join_chat(address, user_id)
         else:
             queue.put(
-                "[系统] 加入聊天室功能尚未接入网络模块（on_join 回调为空）。",
-                MessageType.TYPE_LOCAL_INFO,
+                "[系统] 加入聊天室功能尚未就绪（session 为空）。",
+                MessageType.TYPE_LOCAL_ERROR,
             )
