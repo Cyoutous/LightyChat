@@ -60,6 +60,14 @@ class SessionController:
         )
         server_thread.start()
 
+        # 等待服务端线程准备就绪，再尝试连接本机
+        if not self._server.wait_until_ready(timeout=5.0):
+            self._queue.put(
+                "[系统] 服务端启动超时，请重试。",
+                MessageType.TYPE_LOCAL_ERROR,
+            )
+            return
+
         # 2. 客户端连接本机
         self._connect_and_register(host, port, user_id, is_host=True)
 
