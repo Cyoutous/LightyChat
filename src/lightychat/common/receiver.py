@@ -36,7 +36,7 @@ class Receiver:
             self._sock.shutdown(socket.SHUT_RD)
         except OSError:
             pass
-        if self._thread is not None:
+        if self._thread is not None and threading.current_thread() is not self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
 
@@ -68,7 +68,7 @@ class Receiver:
 
             for msg in messages:
                 if self._on_message is not None:
-                    try:
+                    try:    
                         self._on_message(msg)
                     except Exception:
                         # 回调异常不应导致接收线程崩溃

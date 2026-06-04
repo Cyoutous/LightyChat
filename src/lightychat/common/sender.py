@@ -32,7 +32,7 @@ class Sender:
         """停止发送线程，等待退出。"""
         self._stop_flag = True
         self._queue.put(None)  # 唤醒阻塞在 get() 的线程
-        if self._thread is not None:
+        if self._thread is not None and threading.current_thread() is not self._thread:
             self._thread.join(timeout=2.0)
             self._thread = None
 
