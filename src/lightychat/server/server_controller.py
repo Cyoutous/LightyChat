@@ -65,6 +65,7 @@ class ServerController:
         # 基础组件
         self._proto = ProtocolHandler()
         self._user_table = UserTable()
+        self._ready_event = threading.Event()
 
         # 高层组件 —— 全部使用空实现，待后续替换
         self._message_logger: _Logger = _Logger(self._room_name)
@@ -97,12 +98,17 @@ class ServerController:
             daemon=True, name="Acceptor",
         )
         self._acceptor_thread.start()
+        self._ready_event.set()
 
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat_checker.start,
             daemon=True, name="Heartbeat",
         )
         self._heartbeat_thread.start()
+
+    def wait_until_ready(self, timeout: Optional[float] = None) -> bool:
+        """等待服务端就绪，返回是否在超时前准备完成。"""
+        return self._ready_event.wait(timeout)
 
     def stop(self) -> None:
         """优雅关闭服务端。"""
