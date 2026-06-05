@@ -4,10 +4,11 @@ import threading
 import logging
 from typing import Any, Dict, Optional
 
-from lightychat.server.user_table import UserTable
 from lightychat.common.protocol_handler import ProtocolHandler
+from lightychat.server.user_table import UserTable
 from lightychat.server.connection_manager import ConnectionManager
 from lightychat.server.message_router import MessageRouter
+from lightychat.server.command_handler import CommandHandler
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +21,6 @@ class _BaseModule:
     """所有子模块的基类，统一 start/stop 接口。"""
     def start(self) -> None: ...
     def stop(self) -> None: ...
-
-
-class _CommandHandler:
-    """指令处理器接口：解析并执行管理指令。"""
-    def __init__(self, user_table: UserTable, admin_token: str) -> None: ...
 
 
 class _HeartbeatChecker(_BaseModule):
@@ -52,26 +48,40 @@ class ServerController:
         self._max_users: int = config.get("max_users", 8)
         self._admin_token: str = config.get("admin_token", "")
 
-        # 基础组件
+        # 1. 基础组件（无依赖）
         self._proto = ProtocolHandler()
         self._user_table = UserTable()
         self._ready_event = threading.Event()
 
-        # 高层组件 —— 全部使用空实现，待后续替换
-        self._message_logger: _Logger = _Logger(self._room_name)
-        self._command_handler: _CommandHandler = _CommandHandler(
-            self._user_table, self._admin_token
-        )
+        # 2. 日志模块（几乎无依赖，暂用占位）
+        self._message_logger = _Logger(self._room_name)
+
+        # 3. 指令处理器（依赖 user_table）
+        self._command_handler = CommandHandler({
+            "user_table": self._user_table,
+            "connection": None,  # 下面回填
+            "admin_token": self._admin_token,
+        })
+
+        # 4. 消息路由器（依赖 user_table、command_handler、logger）
         self._message_router = MessageRouter(
             self._user_table,
             command_handler=self._command_handler,
             message_logger=self._message_logger,
         )
+
+        # 5. 连接管理器（依赖 user_table、proto、router）
         self._connection_manager = ConnectionManager(
             self._port, self._user_table, self._proto,
             self._message_router, self._max_users,
         )
-        self._heartbeat_checker: _HeartbeatChecker = _HeartbeatChecker(
+
+        # 6. 回填 connection 到 command_handler
+        if self._command_handler:
+            self._command_handler.set_connection(self._connection_manager)
+
+        # 7. 心跳检测器（依赖 user_table、router）
+        self._heartbeat_checker = _HeartbeatChecker(
             self._user_table, self._message_router
         )
 
