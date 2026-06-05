@@ -13,10 +13,6 @@ logger = logging.getLogger(__name__)
 class CommandHandler:
     """服务端指令路由器：解析 TYPE_COMMAND 消息，分发给对应的 ServerBaseCommand 执行。"""
 
-    ADMIN_COMMANDS = {
-        "kick", "mute", "unmute", "lock", "unlock",
-    }
-
     def __init__(self, context: Dict[str, Any]) -> None:
         """
         context 必须包含：
@@ -25,7 +21,6 @@ class CommandHandler:
             - "admin_token":     str                 # 房主令牌
         """
         self._context = context
-
         self._commands: Dict[str, ServerBaseCommand] = ServerBaseCommand.discover(
             "lightychat.server.commands"
         )
@@ -59,7 +54,8 @@ class CommandHandler:
         if command is None:
             return [self._error_msg(sender_id, f"未知指令：/{cmd_name}")]
 
-        if cmd_name in self.ADMIN_COMMANDS:
+        # 动态检查该指令是否需要管理员权限
+        if command.admin_required:
             if not self._verify_admin(sender_id):
                 return [self._error_msg(sender_id, "权限不足：仅房主可执行此操作")]
 

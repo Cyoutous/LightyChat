@@ -9,6 +9,7 @@ class ServerLockCommand(ServerBaseCommand):
     name = "lock"
     brief = "锁定房间 - 管理员指令"
     detail = "/lock  -  锁定聊天室，拒绝新用户加入。"
+    admin_required = True # 管理员指令
 
     def execute(
         self, args: list[str], context: dict[str, Any]
