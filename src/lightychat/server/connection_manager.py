@@ -165,7 +165,7 @@ class ConnectionManager:
 
         actual_id = requested_id
         if self._user_table.get(requested_id):
-            actual_id = self._generate_fallback_id()
+            actual_id : str = self._generate_fallback_id(requested_id)
 
         # ------- 第三阶段：创建收发线程并注册 -------
         sender = Sender(sock, self._proto)
@@ -281,10 +281,10 @@ class ConnectionManager:
         finally:
             sock.close()
 
-    def _generate_fallback_id(self) -> str:
+    def _generate_fallback_id(self, original_id: str) -> str:
         import random
 
         while True:
-            uid = f"User{random.randint(1000, 9999)}"
+            uid = f"{original_id}{random.randint(1000, 9999)}"
             if not self._user_table.get(uid):
                 return uid
