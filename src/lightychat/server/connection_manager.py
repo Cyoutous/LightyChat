@@ -228,15 +228,17 @@ class ConnectionManager:
         if user is None:
             return
 
-        if user.sender:
-            user.sender.stop()
-        if user.receiver:
-            user.receiver.stop()
-
+        # 🔑 先关 socket，让阻塞中的 recv() 立即抛异常退出；
+        #    否则 Windows 上 shutdown(SHUT_RD) 不能中断 recv()，join 会卡满 2s。
         try:
             user.sock.close()
         except OSError:
             pass
+
+        if user.sender:
+            user.sender.stop()
+        if user.receiver:
+            user.receiver.stop()
 
         if self._router and hasattr(self._router, "broadcast_system_message"):
             self._router.broadcast_system_message(f"{user_id} 离开了聊天室")
