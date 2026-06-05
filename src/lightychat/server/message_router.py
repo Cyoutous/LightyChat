@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 from lightychat.common.entities import Message, MessageType
 from lightychat.server.user_table import UserTable
+from lightychat.server.command_handler import CommandHandler
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class MessageRouter:
     def __init__(
         self,
         user_table: UserTable,
-        command_handler: Optional[Any] = None,
+        command_handler: CommandHandler,
         message_logger: Optional[Any] = None,
     ) -> None:
         self._user_table = user_table
@@ -90,7 +91,19 @@ class MessageRouter:
 
     def _handle_command(self, msg: Message, sender_id: str, sender_sender: Any) -> None:
         if self._command_handler:
-            self._command_handler.handle(msg, sender_id, sender_sender)
+            results = self._command_handler.handle(msg, sender_id, sender_sender)
+
+            for result_msg in results:
+                if result_msg.receiver_id == "":
+                    # 广播给所有人
+                    for user in self._user_table.get_all():
+                        if user.sender:
+                            user.sender.send(result_msg)
+                else:
+                    # 单播给指定用户
+                    target = self._user_table.get(result_msg.receiver_id)
+                    if target and target.sender:
+                        target.sender.send(result_msg)
         else:
             resp = Message(
                 type=MessageType.TYPE_RESPONSE,
