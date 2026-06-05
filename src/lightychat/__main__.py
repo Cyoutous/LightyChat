@@ -33,7 +33,8 @@ def main() -> None:
         message_queue=msg_queue,
         user_cache=input_switch.get_cached_user,
         session=session,
-        # send_chat 和 send_command 暂时不传，后续远程指令实现后再注入
+        send_chat=session.send_message,
+        send_command=session.send_command,
     )
 
     # 6. 依赖注入
