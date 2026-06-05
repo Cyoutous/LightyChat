@@ -9,6 +9,7 @@ class ServerUnlockCommand(ServerBaseCommand):
     name = "unlock"
     brief = "解锁房间 - 管理员指令"
     detail = "/unlock  -  解锁聊天室，恢复新用户加入的权限。"
+    admin_required = True # 管理员指令
 
     def execute(
         self, args: list[str], context: dict[str, Any]
