@@ -123,7 +123,7 @@ class SessionController:
         self._admin_token = None
 
     # 发送消息 （测试时添加，不确定是否保留）
-    def send_chat_message(self, text: str) -> None:
+    def send_message(self, text: str) -> None:
         """发送公屏聊天消息。"""
         if self._sender is None:
             self._queue.put(
@@ -136,6 +136,24 @@ class SessionController:
             sender_id=self._switch.get_cached_user()["user_id"],
             receiver_id="",
             payload=text.encode("utf-8"),
+        )
+        self._sender.send(msg)
+
+    # session_controller.py，紧接在 send_message 方法后面
+    def send_command(self, payload: str) -> None:
+        """发送指令到服务器。"""
+        if self._sender is None:
+            self._queue.put(
+                "[系统] 尚未连接到服务器。",
+                MessageType.TYPE_LOCAL_ERROR,
+            )
+            return
+        user_info = self._switch.get_cached_user()
+        msg = Message(
+            type=MessageType.TYPE_COMMAND,
+            sender_id=user_info.get("user_id", ""),
+            receiver_id="",
+            payload=payload.encode("utf-8"),
         )
         self._sender.send(msg)
 
