@@ -7,7 +7,7 @@ from lightychat.common.entities import MessageType
 
 class LockCommand(Command):
     name = "lock"
-    brief = "锁定房间（房主）"
+    brief = "锁定房间 - 管理员指令"
     detail = (
         "/lock\n"
         "  锁定聊天室，此后新用户无法加入。\n"

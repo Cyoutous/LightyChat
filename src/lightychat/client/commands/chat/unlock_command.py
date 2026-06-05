@@ -7,7 +7,7 @@ from lightychat.common.entities import MessageType
 
 class UnlockCommand(Command):
     name = "unlock"
-    brief = "解锁房间（房主）"
+    brief = "解锁房间 - 管理员指令"
     detail = (
         "/unlock\n"
         "  解锁聊天室，恢复新用户加入的权限。"
