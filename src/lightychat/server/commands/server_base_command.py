@@ -15,6 +15,7 @@ class ServerBaseCommand(ABC):
     name: str = ""
     brief: str = ""   # 简介，供 /help 使用（服务端也可能需要）
     detail: str = ""  # 详细帮助
+    admin_required: bool = False
 
     @abstractmethod
     def execute(self, args: list[str], context: dict[str, Any]) -> List[Message]:
