@@ -37,7 +37,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build
-        run: pyinstaller --name lightyChat --onefile --console --paths src src/lightychat/__main__.py
+        run: pyinstaller --name lightyChat --onefile --console --paths src --collect-submodules lightychat.client.commands --collect-submodules lightychat.server.commands src/lightychat/__main__.py
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
