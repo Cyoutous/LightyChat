@@ -10,20 +10,9 @@ from lightychat.server.user_table import UserTable
 from lightychat.server.connection_manager import ConnectionManager
 from lightychat.server.message_router import MessageRouter
 from lightychat.server.command_handler import CommandHandler
+from lightychat.server.logger import Logger
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# 子模块抽象接口 (后续由具体实现替换)
-# =============================================================================
-
-class _Logger:
-    """日志模块接口：记录公屏消息和系统事件到文件。"""
-    def __init__(self, room_name: str) -> None: ...
-    def log(self, text: str) -> None: ...
-    def close(self) -> None: ...
-
 
 # =============================================================================
 # ServerController
@@ -43,8 +32,8 @@ class ServerController:
         self._user_table = UserTable()
         self._ready_event = threading.Event()
 
-        # 2. 日志模块（几乎无依赖，暂用占位）
-        self._message_logger = _Logger(self._room_name)
+        # 2. 日志模块
+        self._message_logger = Logger(self._room_name)
 
         # 3. 指令处理器（依赖 user_table）
         self._command_handler = CommandHandler({
