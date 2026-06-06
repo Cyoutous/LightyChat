@@ -23,6 +23,7 @@ htmlcov/
 
 # 日志文件
 *.log
+logs/
 
 # 操作系统
 .DS_Store
@@ -30,3 +31,4 @@ Thumbs.db
 
 #sandbox
 sandbox/
+src/lightychat/common/test_sender_receiver.py
