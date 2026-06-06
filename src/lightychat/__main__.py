@@ -10,8 +10,6 @@ from lightychat.client.session_controller import SessionController
 from lightychat.client.command_router import CommandRouter
 from lightychat.common.settings import Settings
 
-#from lightychat.common.entities import  MessageType
-
 
 def main() -> None:
     # 1. 基础服务模块

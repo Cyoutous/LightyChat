@@ -146,7 +146,6 @@ class SessionController:
         )
         self._sender.send(msg)
 
-    # session_controller.py，紧接在 send_message 方法后面
     def send_command(self, payload: str) -> None:
         """发送指令到服务器。"""
         if self._sender is None:

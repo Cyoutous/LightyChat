@@ -32,5 +32,3 @@ class UnlockCommand(Command):
             return
 
         send_command("/unlock")
-        #queue.put("[系统] 房间已解锁，新用户可以加入。", MessageType.TYPE_SYSTEM)
-        #不执行上方语句，应该由服务器负责

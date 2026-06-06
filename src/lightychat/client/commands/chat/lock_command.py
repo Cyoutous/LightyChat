@@ -33,5 +33,3 @@ class LockCommand(Command):
             return
 
         send_command("/lock")
-        #queue.put("[系统] 房间已锁定，新用户无法加入。", MessageType.TYPE_SYSTEM)
-        #不执行上方语句，应该由服务器负责

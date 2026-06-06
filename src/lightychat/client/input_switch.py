@@ -1,5 +1,4 @@
 from __future__ import annotations
-# from codeop import CommandCompiler
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from lightychat.client.message_queue import MessageQueue
