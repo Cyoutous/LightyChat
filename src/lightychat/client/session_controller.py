@@ -5,6 +5,7 @@ from typing import Optional, Any
 
 from lightychat.client.message_queue import MessageQueue
 from lightychat.client.input_switch import InputSwitch
+from lightychat.client.heartbeat_client import HeartbeatClient
 from lightychat.common.entities import Message, MessageType
 from lightychat.common.protocol_handler import ProtocolHandler
 from lightychat.common.sender import Sender
@@ -31,6 +32,7 @@ class SessionController:
         self._receiver: Optional[Receiver] = None
         self._server: Optional[ServerController] = None
         self._admin_token: Optional[str] = None
+        self._heartbeat: Optional[HeartbeatClient] = None
 
     # ---------- 公开接口 ----------
 
@@ -263,10 +265,22 @@ class SessionController:
             MessageType.TYPE_SYSTEM,
         )
 
+        # 启动心跳模块
+        if self._sender is not None:
+            self._heartbeat = HeartbeatClient(self._sender)
+            self._heartbeat.start()
+
     def _on_disconnect(self) -> None:
         """连接断开回调：通知 UI 并清理资源。"""
         self._queue.put(
             "[系统] 与服务器的连接已断开。",
             MessageType.TYPE_SYSTEM,
         )
+
+        # 关闭心跳模块
+        if self._heartbeat:
+            self._heartbeat.stop()
+            self._heartbeat = None
+
+        # 断开
         self.disconnect()
