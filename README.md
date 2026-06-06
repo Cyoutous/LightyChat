@@ -31,3 +31,7 @@ pip install .
 ## 许可证
 
 本项目采用 [MIT License](LICENSE) 许可。
+
+## 贡献
+
+本项目暂不接受 Pull Request，欢迎提 Issue 交流。
