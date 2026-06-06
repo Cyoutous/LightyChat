@@ -149,8 +149,15 @@ class TerminalUI:
         rows, cols = stdscr.getmaxyx()
 
         # 初始欢迎信息
+        self._message_history.append(("⭐ Welcome to LIGHTYCHAT! ⭐", None))
         self._message_history.append(
-            ("Chat started! Type /quit to exit. Ctrl+Q to quit UI.", None)
+            ("- 使用 /create <房间名> <昵称> <端口> 创建房间", None)
+        )
+        self._message_history.append(
+            ("- 使用 /join <昵称> <IP:端口> 加入房间", None)
+        )
+        self._message_history.append(
+            ("- 使用 /help 查询更多操作", None)
         )
 
         # 首次阻塞等待，避免启动时闪烁过快
