@@ -32,3 +32,4 @@ Thumbs.db
 #sandbox
 sandbox/
 src/lightychat/common/test_sender_receiver.py
+lightyChat.spec
