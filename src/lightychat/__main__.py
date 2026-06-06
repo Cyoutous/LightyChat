@@ -1,24 +1,49 @@
-#!/usr/bin/env python3
-"""客户端主入口 - 回声测试阶段"""
+# lightychat/__main__.py
+"""
+客户端主入口：组装所有模块，启动终端界面。
+"""
 from lightychat.client.message_queue import MessageQueue
 from lightychat.client.terminal_ui import TerminalUI
 from lightychat.client.input_switch import InputSwitch
+from lightychat.client.lobby_handler import LobbyHandler
+from lightychat.client.session_controller import SessionController
+from lightychat.client.command_router import CommandRouter
+from lightychat.common.settings import Settings
+
+#from lightychat.common.entities import  MessageType
 
 
 def main() -> None:
-    # 1. 创建消息队列
+    # 1. 基础服务模块
     msg_queue = MessageQueue()
+    settings = Settings()
 
-    # 2. 创建输入转移模块（暂不注入大厅和指令路由，使用内置回声逻辑）
+    # 2. 输入转移模块
     input_switch = InputSwitch(message_queue=msg_queue)
 
-    # 3. 创建 TerminalUI，传入消息队列
+    # 3. 会话控制器
+    session = SessionController(msg_queue, input_switch, settings)
+
+    # 4. 大厅处理模块（未连接状态）
+    lobby = LobbyHandler(msg_queue, settings, session=session)
+
+
+    # 5. 聊天室上下文（连接状态下可用）
+    chat_router = CommandRouter(
+        message_queue=msg_queue,
+        user_cache=input_switch.get_cached_user,
+        session=session,
+        send_chat=session.send_message,
+        send_command=session.send_command,
+    )
+
+    # 6. 依赖注入
+    input_switch.bind_lobby_handler(lobby)
+    input_switch.bind_command_router(chat_router)
+
+    # 7. 终端界面
     ui = TerminalUI(message_queue=msg_queue)
-
-    # 4. 启动 UI 事件循环，用户输入通过 input_switch.route 处理
     ui.run(on_input=input_switch.route)
-
-    #做一个测试
 
 
 if __name__ == "__main__":
