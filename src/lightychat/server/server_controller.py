@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from lightychat.common.protocol_handler import ProtocolHandler
+from lightychat.server.heartbeat_checker import HeartbeatChecker
 from lightychat.server.user_table import UserTable
 from lightychat.server.connection_manager import ConnectionManager
 from lightychat.server.message_router import MessageRouter
@@ -16,17 +17,6 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # 子模块抽象接口 (后续由具体实现替换)
 # =============================================================================
-
-class _BaseModule:
-    """所有子模块的基类，统一 start/stop 接口。"""
-    def start(self) -> None: ...
-    def stop(self) -> None: ...
-
-
-class _HeartbeatChecker(_BaseModule):
-    """心跳检测器接口：定期扫描在线用户表，踢出超时用户。"""
-    def __init__(self, user_table: UserTable, router: Any) -> None: ...
-
 
 class _Logger:
     """日志模块接口：记录公屏消息和系统事件到文件。"""
@@ -81,8 +71,8 @@ class ServerController:
             self._command_handler.set_connection(self._connection_manager)
 
         # 7. 心跳检测器（依赖 user_table、router）
-        self._heartbeat_checker = _HeartbeatChecker(
-            self._user_table, self._message_router
+        self._heartbeat_checker = HeartbeatChecker(
+            self._user_table, self._connection_manager
         )
 
         self._running = False
