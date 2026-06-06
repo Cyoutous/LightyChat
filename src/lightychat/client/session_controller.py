@@ -215,12 +215,22 @@ class SessionController:
             if payload_text.startswith("/register"):
                 self._handle_register_response(payload_text)
                 return
+            # 指令响应直接显示内容，不加标签
+            self._queue.put(payload_text, msg.type)
+            return
 
-        # 其他消息：格式化后推入显示队列
-        self._queue.put(
-            f"[{msg.type.name}] {msg.sender_id}: {msg.payload.decode('utf-8', errors='replace')}",
-            msg.type,  # 保留消息类型以便 UI 着色
-        )
+        payload_text = msg.payload.decode("utf-8", errors="replace")
+
+        # 仅对需要标签的类型做处理
+        if msg.type == MessageType.TYPE_SYSTEM:
+            formatted = f"[系统] {payload_text}"
+        elif msg.type == MessageType.TYPE_PRIVATE_DELIVER:
+            formatted = f"[私聊] {payload_text}"
+        else:
+            # TYPE_MESSAGE_DELIVER 等：直接显示
+            formatted = f"{msg.sender_id}: {payload_text}" if msg.sender_id else payload_text
+
+        self._queue.put(formatted, msg.type)
 
     def _handle_register_response(self, payload: str) -> None:
         """解析注册响应，更新 InputSwitch 状态。"""
