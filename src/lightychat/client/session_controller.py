@@ -101,7 +101,12 @@ class SessionController:
 
     def disconnect(self) -> None:
         """断开当前连接，停止收发线程，清理资源。"""
-        # 1. 停止客户端收发
+        # 1. 停止心跳模块（必须在收发线程停止之前）
+        if self._heartbeat:
+            self._heartbeat.stop()
+            self._heartbeat = None
+
+        # 2. 停止客户端收发
         if self._sender:
             self._sender.stop()
             self._sender = None
@@ -211,6 +216,10 @@ class SessionController:
 
     def _on_message(self, msg: Message) -> None:
         """处理收到的消息：注册响应 -> 更新状态；其他消息 -> 推入显示队列。"""
+        # 心跳应答消息不显示，由心跳模块内部消化
+        if msg.type == MessageType.TYPE_HEARTBEAT_ACK:
+            return
+
         if msg.type == MessageType.TYPE_RESPONSE:
             # 检查是否为注册响应（简单约定：内容以 "/register" 开头）
             payload_text = msg.payload.decode("utf-8", errors="replace")
