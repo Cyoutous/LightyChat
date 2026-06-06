@@ -14,7 +14,7 @@ class CreateCommand(Command):
         "  房间名：UTF-8，1~32字符，含空格需用引号包裹。\n"
         "  昵称  ：字母、数字、下划线，1~16字符。\n"
         "  端口  ：1~65535。\n"
-        "  示例：/create \"我的房间\" Alice 8080"
+        "  示例：/create 我的房间 Alice 8080"
     )
 
     def execute(self, args: list[str], context: dict[str, Any]) -> None:
