@@ -405,6 +405,10 @@ class TerminalUI:
         self._input_buffer = ""
         self._cursor_index = 0
 
+        # 忽略空内容和纯空白输入
+        if not text.strip():
+            return
+
         # /quit 在任何状态下直接退出程序
         if text == "/quit":
             self._quit = True
