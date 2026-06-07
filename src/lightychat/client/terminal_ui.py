@@ -226,6 +226,7 @@ class TerminalUI:
 
 
     def _refresh_screen_size(self, old_rows: int, old_cols: int) -> Tuple[int, int]:
+        curses.update_lines_cols()  # 强制 PDCurses 立即检测终端尺寸变化，避免 refresh() 时越界崩溃
         new_rows, new_cols = self._stdscr.getmaxyx()
         if new_rows != old_rows or new_cols != old_cols:
             self._stdscr.clear()
